@@ -1,6 +1,10 @@
 iTunesArtworkFinder
 ===================
 
+Demo
+----
+[http://mauricesvay.github.com/iTunesArtworkFinder/](http://mauricesvay.github.com/iTunesArtworkFinder/)
+
 How to use
 ----------
 
