@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>iTunes Cover Search</title>
+	<link rel="stylesheet" type="text/css" href="http://current.bootstrapcdn.com/bootstrap-v204/css/bootstrap-combined.min.css">
+	<style>
+	select {
+		width: auto;
+	}
+	#sample {
+		display: none;
+	}
+	#library {
+		display: none;
+		overflow: hidden;
+	}
+	#cover img {
+		display: block;
+		width: 600px;
+		height: auto;
+	}
+	#albums ul {
+		margin: 0;
+		height: 600px;
+		overflow: auto;
+		border: 1px solid #DDD;
+	}
+	#albums li {
+		list-style: none;
+		border-bottom: 1px solid #DDD;
+		padding: 3px;
+		cursor: pointer;
+	}
+	#albums li:hover {
+		background: #F3F3F3;
+	}
+	</style>
+</head>
+<body>
+<div class="container">
+	<div class="page-header">
+		<h1>iTunes Cover Search</h1>
+	</div>
+	<div id="import">
+		<h2>Import your iTunes library</h2>
+		<label for="paste">In your iTunes, select all your songs (CTRL+A), copy and paste below:</label>
+		<textarea id="paste" class="span12"></textarea>
+		<div id="sample">
+			<h2>Almost there...</h2>
+			<p>
+				Just tell me which one is the <strong>artist</strong> and which 
+				one is the <strong>album</strong>. 
+				Then <button class="btn btn-small btn-primary" disabled="disabled">Import </button>
+			</p>
+			<form></form>
+		</div>
+	</div>
+	<div id="library" class="row">
+		<div id="albums" class="span4">
+			<ul></ul>
+		</div>
+		<div id="cover" class="span8"></div>
+	</div>
+</div>
+<script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+<script type="text/javascript">
+var App = {
+	tracks : [],
+	albums : {},
+
+	init: function() {
+		$('#paste').on('paste', function(){
+			setTimeout(App.importTracks, 500);
+		});
+
+		$('#sample').delegate('select', 'change', function(){
+			$('#sample button').removeAttr('disabled');
+		});
+
+		$('#sample button').on('click', function(e){
+			e.preventDefault();
+			App.buildIndex();
+			$('#import').hide();
+			$('#library').show();
+		});
+
+		$('#albums').delegate('li', 'click', function() {
+			var term = $(this).text();
+			$.ajax({
+				url : "http://itunes.apple.com/search",
+				type: 'GET',
+				dataType: 'jsonp',
+				data : {
+					term: term,
+					media: "music",
+					entity: "album",
+					limit: 1
+				},
+				success: function(data, status, xhr) {
+					var coverUrl;
+					if (data.resultCount > 0) {
+						coverUrl = data.results[0].artworkUrl100.replace('100x100', '600x600');
+						$("#cover").html('<img src="' + coverUrl + '" alt="">');
+					} else {
+						alert("No cover found");
+					}
+				}
+			})
+		});
+	},
+
+	importTracks: function() {
+		$('#sample').show();
+		App.tracks = [];
+		var lines = $("#paste").val().trim().split(/\n/);
+		var line = '';
+		for (var i=0,l=lines.length; i<l; i++) {
+			App.tracks.push(lines[i].split(/\t/));
+		}
+		// console.log('Imported: ' + App.tracks.length);
+		App.sample();
+	},
+
+	sample: function() {
+		var max = App.tracks.length;
+		var step = Math.floor(max / 5);
+
+		var out = '<table class="table table-bordered">';
+		out += '<tr>';
+		for (var j=0, l=App.tracks[0].length; j<l; j++) {
+			out += '<th><select name="field-' + j + '"><option>Select</option><option>Artist</option><option>Album</option></select></th>';
+		}
+		out += '</tr>';
+		for (var i=0; i<max; i+=step) {
+			out += '<tr>';
+			for (var j=0, l=App.tracks[i].length; j<l; j++) {
+				out += '<td>' + App.tracks[i][j] + '</td>';
+			}
+			out += '</tr>';
+		}
+		out += '</table>';
+		$('#sample > form').first().html(out);
+	},
+
+	buildIndex: function(col) {
+		var artistCol = null;
+		var albumCol = null;
+		var out = '';
+		var artist = '';
+
+		$('#sample select').each(function(){
+			if ($(this).val() == 'Artist') {
+				artistCol = $(this).attr('name').replace('field-','');
+			}
+			if ($(this).val() == 'Album') {
+				albumCol = $(this).attr('name').replace('field-','');
+			}
+		});
+
+		for (var i=0,l=App.tracks.length; i<l; i++) {
+
+			//skip empty album names
+			if (App.tracks[i][albumCol] == '') {
+				continue;
+			}
+
+			if (App.albums.hasOwnProperty(App.tracks[i][albumCol])) {
+				App.albums[App.tracks[i][albumCol]].artists.push(App.tracks[i][artistCol]);
+			} else {
+				App.albums[App.tracks[i][albumCol]] = {
+					'artists' : [App.tracks[i][artistCol]]
+				}
+			}
+		}
+
+		for (var name in App.albums) {
+			artist = App.getArtist(App.albums[name]);
+			if (artist !== '') {
+				out += '<li>' + App.getArtist(App.albums[name]) + ' - ' + name + '</li>';
+			} else {
+				out += '<li>' + name + '</li>';
+			}
+		}
+
+		$('#albums ul').html(out);
+	},
+
+	getArtist: function(album) {
+		album.artists.sort();
+		var first = album.artists[0];
+		for (var i=1; i<album.artists.length; i++) {
+		   if (album.artists[i] != first) {
+		   		return '';//"Various artists";
+		   }
+		   last = album.artists[i];
+		}
+		return last;
+	}
+}
+App.init();
+</script>
+</body>
+</html>
